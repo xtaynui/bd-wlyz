@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>使用日志查询</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .nav { margin-bottom: 20px; text-align: center; }
+        .nav a { margin-right: 15px; text-decoration: none; color: #007bff; font-weight: bold; }
+        .search-form { display: flex; gap: 10px; margin-bottom: 20px; align-items: end; }
+        .search-form input, .search-form select, .search-form button { padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        .search-form input, .search-form select { flex-grow: 1; }
+        .log-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .log-table th, .log-table td { border: 1px solid #ddd; padding: 8px; text-align: left; word-break: break-all; }
+        .log-table th { background-color: #f2f2f2; }
+        .pagination { margin-top: 20px; display: flex; justify-content: center; gap: 5px; }
+        .pagination button { padding: 8px 12px; border: 1px solid #ddd; background: #fff; cursor: pointer; border-radius: 4px; }
+        .pagination button.active { background: #007bff; color: white; border-color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/dashboard.html">生成卡密</a>
+            <a href="/manage.html">管理卡密</a>
+            <a href="/logs.html">使用日志</a>
+            <a href="/software.html">软件管理</a>
+            <a href="/admin.html" onclick="localStorage.removeItem('loggedin');">退出登录</a>
+        </div>
+        <h2>使用日志查询</h2>
+        <form class="search-form" id="search-form">
+            <select id="search_type">
+                <option value="">全部</option>
+                <option value="card_key">按卡密</option>
+                <option value="device_id">按设备ID</option>
+            </select>
+            <input type="text" id="search_value" placeholder="输入搜索内容">
+            <button type="submit">查询</button>
+        </form>
+        <div id="log-container"></div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <script>
+    if (!localStorage.getItem('loggedin')) {
+        window.location.href = '/admin.html';
+    }
+
+    let currentPage = 1;
+    const limit = 20;
+
+    async function fetchAndRenderLogs(page = 1) {
+        const searchType = document.getElementById('search_type').value;
+        const searchValue = document.getElementById('search_value').value;
+        const container = document.getElementById('log-container');
+        const pagination = document.getElementById('pagination');
+
+        const response = await fetch('/admin/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ search_type: searchType, search_value: searchValue, page, limit })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            // 渲染日志表格
+            if (result.logs.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#999;">没有找到相关日志</p>';
+            } else {
+                let tableHTML = `
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>卡密</th>
+                                <th>设备ID</th>
+                                <th>IP地址</th>
+                                <th>验证时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                result.logs.forEach(log => {
+                    const date = new Date(log.validated_at).toLocaleString('zh-CN');
+                    tableHTML += `
+                        <tr>
+                            <td>${log.card_key}</td>
+                            <td>${log.device_id}</td>
+                            <td>${log.ip_address}</td>
+                            <td>${date}</td>
+                        </tr>
+                    `;
+                });
+                tableHTML += '</tbody></table>';
+                container.innerHTML = tableHTML;
+            }
+
+            // 渲染分页
+            renderPagination(result.pagination);
+        } else {
+            container.innerHTML = `<p style="text-align:center; color:red;">查询失败: ${result.message}</p>`;
+        }
+    }
+    
+    function renderPagination(pagination) {
+        const paginationEl = document.getElementById('pagination');
+        paginationEl.innerHTML = '';
+        if (pagination.totalPages <= 1) return;
+
+        for (let i = 1; i <= pagination.totalPages; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            if (i === pagination.page) {
+                btn.className = 'active';
+            }
+            btn.onclick = () => {
+                currentPage = i;
+                fetchAndRenderLogs(i);
+            };
+            paginationEl.appendChild(btn);
+        }
+    }
+
+    document.getElementById('search-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        currentPage = 1;
+        fetchAndRenderLogs(1);
+    });
+
+    // 页面加载时获取第一页日志
+    fetchAndRenderLogs(1);
+    </script>
+</body>
+</html>
