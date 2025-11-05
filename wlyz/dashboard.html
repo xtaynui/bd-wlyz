@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>管理员控制面板</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { color: #333; }
+        form { margin-bottom: 20px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 10px; margin: 5px 0 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; width: 100%; }
+        button:hover { background-color: #218838; }
+        .generated-keys { margin-top: 20px; }
+        .key-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f9f9f9; border-radius: 4px; margin-bottom: 5px; }
+        .copy-button { margin-left: 10px; padding: 5px 10px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; }
+        .copy-button:hover { background-color: #0056b3; }
+        .nav { margin-bottom: 20px; }
+        .nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/dashboard.html">生成卡密</a>
+            <a href="/manage.html">管理卡密</a>
+            <a href="/logs.html">使用日志</a>
+            <a href="/software.html">软件管理</a>
+            <a href="/admin.html">退出登录</a>
+        </div>
+        <h2>生成卡密</h2>
+        <form id="generate-form">
+            <label for="expiry_date">到期时间 (格式: YYYY-MM-DD):</label>
+            <input type="date" id="expiry_date" required>
+            
+            <label for="quantity">生成数量:</label>
+            <input type="number" id="quantity" min="1" max="100" required>
+            
+            <button type="submit">生成卡密</button>
+        </form>
+
+        <div id="generated-keys" class="generated-keys"></div>
+    </div>
+
+    <script>
+    // 检查登录状态
+    if (!localStorage.getItem('loggedin')) {
+        window.location.href = '/admin.html';
+    }
+
+    document.getElementById('generate-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const expiryDate = document.getElementById('expiry_date').value;
+        const quantity = document.getElementById('quantity').value;
+        const keysContainer = document.getElementById('generated-keys');
+
+        const response = await fetch('/admin/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ expiry_date: expiryDate, quantity: parseInt(quantity) })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            keysContainer.innerHTML = '<h3>生成的卡密:</h3>';
+            result.keys.forEach(key => {
+                const keyDiv = document.createElement('div');
+                keyDiv.className = 'key-item';
+                keyDiv.innerHTML = `
+                    <span>${key}</span>
+                    <button class="copy-button" onclick="copyToClipboard('${key}')">复制</button>
+                `;
+                keysContainer.appendChild(keyDiv);
+            });
+        } else {
+            alert('生成失败: ' + result.message);
+        }
+    });
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('卡密已复制到剪贴板！');
+        });
+    }
+    </script>
+</body>
+</html>
